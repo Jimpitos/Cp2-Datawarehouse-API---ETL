@@ -1,0 +1,17 @@
+{
+	"name": "LS_Azure_SQL",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"server": "aci-cp2-rm555295.database.windows.net",
+			"database": "cp2-db-dw-rm555295",
+			"encrypt": "mandatory",
+			"trustServerCertificate": false,
+			"authenticationType": "SQL",
+			"userName": "MYSQL_ADMIN_PASSWORD",
+			"encryptedCredential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQERGNDhBRjc0LUI0RDQtNEFCQy1BNkFFLTExQTA3QjZCNEM3Q18yMGVkNDk5YS04MzFkLTQwYTEtYWMxNS0zZTExMGZmNzkxMmQiDQp9"
+		}
+	}
+}

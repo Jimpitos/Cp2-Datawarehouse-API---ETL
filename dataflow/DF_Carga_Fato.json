@@ -1,0 +1,128 @@
+{
+	"name": "DF_Carga_Fato",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_ADLS_Raw",
+						"type": "DatasetReference"
+					},
+					"name": "CargadaFato"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_DIM",
+						"type": "DatasetReference"
+					},
+					"name": "CargadaDimensao"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_FATO",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "flatten1"
+				},
+				{
+					"name": "lookup1"
+				},
+				{
+					"name": "derivedColumn1"
+				},
+				{
+					"name": "select1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          bbox as double[],",
+				"          features as (geometry as (coordinates as double[], type as string), id as string, properties as (alert as string, cdi as double, code as string, detail as string, dmin as double, felt as short, gap as short, ids as string, mag as double, magType as string, mmi as double, net as string, nst as short, place as string, rms as double, sig as short, sources as string, status as string, time as long, title as string, tsunami as boolean, type as string, types as string, tz as string, updated as long, url as string), type as string)[],",
+				"          metadata as (api as string, count as short, generated as long, status as short, title as string, url as string),",
+				"          type as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     documentForm: 'documentPerLine') ~> CargadaFato",
+				"source(output(",
+				"          REDE_SK as integer,",
+				"          CODIGO_REDE as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> CargadaDimensao",
+				"CargadaFato foldDown(unroll(features),",
+				"     mapColumn(",
+				"          geometry = features.geometry,",
+				"          id = features.id,",
+				"          properties = features.properties,",
+				"          type = features.type",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flatten1",
+				"flatten1, CargadaDimensao lookup(properties.net == CODIGO_REDE,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> lookup1",
+				"lookup1 derive(DATA_HORA_UTC = toTimestamp(toLong(properties.time)),",
+				"          LONGITUDE = toDecimal(geometry.coordinates[1], 10, 6),",
+				"          LATITUDE = toDecimal(geometry.coordinates[2], 10, 6),",
+				"          PROFUNDIDADE = toDecimal(geometry.coordinates[3], 10, 3)) ~> derivedColumn1",
+				"derivedColumn1 select(mapColumn(",
+				"          id,",
+				"          REDE_SK,",
+				"          CODIGO_REDE,",
+				"          DATA_HORA_UTC,",
+				"          LONGITUDE,",
+				"          LATITUDE,",
+				"          PROFUNDIDADE,",
+				"          MAGNITUDE = properties.mag,",
+				"          LOCAL_DESCRICAO = properties.place",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select1",
+				"select1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          EVENTO_SK as long,",
+				"          EVENTO_ID as string,",
+				"          REDE_SK as integer,",
+				"          DATA_HORA_UTC as timestamp,",
+				"          MAGNITUDE as decimal(6,2),",
+				"          PROFUNDIDADE_KM as decimal(10,3),",
+				"          LONGITUDE as decimal(10,6),",
+				"          LATITUDE as decimal(10,6),",
+				"          LOCAL_DESCRICAO as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          EVENTO_ID = id,",
+				"          REDE_SK,",
+				"          DATA_HORA_UTC,",
+				"          MAGNITUDE,",
+				"          PROFUNDIDADE_KM = PROFUNDIDADE,",
+				"          LONGITUDE,",
+				"          LATITUDE,",
+				"          LOCAL_DESCRICAO",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}
