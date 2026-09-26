@@ -1,0 +1,601 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Nome do Data Factory",
+			"defaultValue": "adf-cp2-rm555295"
+		},
+		"LS_ADLS_Gen2_accountKey": {
+			"type": "secureString",
+			"metadata": "Cadeia de caracteres segura para 'accountKey' de 'LS_ADLS_Gen2'"
+		},
+		"LS_Azure_SQL_password": {
+			"type": "secureString",
+			"metadata": "Cadeia de caracteres segura para 'password' de 'LS_Azure_SQL'"
+		},
+		"LS_ADLS_Gen2_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://stgcp2rm555295.dfs.core.windows.net/"
+		},
+		"LS_Azure_SQL_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "aci-cp2-rm555295.database.windows.net"
+		},
+		"LS_Azure_SQL_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "cp2-db-dw-rm555295"
+		},
+		"LS_Azure_SQL_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "MYSQL_ADMIN_PASSWORD"
+		},
+		"LS_REST_API_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://earthquake.usgs.gov/"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_ADLS_Gen2')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('LS_ADLS_Gen2_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('LS_ADLS_Gen2_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_Azure_SQL')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"server": "[parameters('LS_Azure_SQL_properties_typeProperties_server')]",
+					"database": "[parameters('LS_Azure_SQL_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SQL",
+					"userName": "[parameters('LS_Azure_SQL_properties_typeProperties_userName')]",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('LS_Azure_SQL_password')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_REST_API')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "RestService",
+				"typeProperties": {
+					"url": "[parameters('LS_REST_API_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_ADLS_Raw')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_ADLS_Gen2",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "earthquakes_2024_01.geojson",
+						"folderPath": "raw/prova_usgs",
+						"fileSystem": "landing"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS_Gen2')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_REST')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_REST_API",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {
+					"relativeUrl": "fdsnws/event/1/query?format=geojson&starttime=2024-01-01&endtime=2024-02-01&minmagnitude=4.5&orderby=time-asc"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_REST_API')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_DIM')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_Azure_SQL",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "REDE_SK",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "CODIGO_REDE",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "DIM_REDE_SISMICA"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_Azure_SQL')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_FATO')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_Azure_SQL",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "EVENTO_SK",
+						"type": "bigint",
+						"precision": 19
+					},
+					{
+						"name": "EVENTO_ID",
+						"type": "nvarchar"
+					},
+					{
+						"name": "REDE_SK",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "DATA_HORA_UTC",
+						"type": "datetime2",
+						"scale": 3
+					},
+					{
+						"name": "MAGNITUDE",
+						"type": "decimal",
+						"precision": 6,
+						"scale": 2
+					},
+					{
+						"name": "PROFUNDIDADE_KM",
+						"type": "decimal",
+						"precision": 10,
+						"scale": 3
+					},
+					{
+						"name": "LONGITUDE",
+						"type": "decimal",
+						"precision": 10,
+						"scale": 6
+					},
+					{
+						"name": "LATITUDE",
+						"type": "decimal",
+						"precision": 10,
+						"scale": 6
+					},
+					{
+						"name": "LOCAL_DESCRICAO",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "FATO_TERREMOTO"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_Azure_SQL')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_Carga_Dimensao')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_ADLS_Raw",
+								"type": "DatasetReference"
+							},
+							"name": "CargadaDimensao"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_DIM",
+								"type": "DatasetReference"
+							},
+							"name": "sink1"
+						}
+					],
+					"transformations": [
+						{
+							"name": "flatten2"
+						},
+						{
+							"name": "aggregate2"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          bbox as double[],",
+						"          features as (geometry as (coordinates as double[], type as string), id as string, properties as (alert as string, cdi as double, code as string, detail as string, dmin as double, felt as short, gap as short, ids as string, mag as double, magType as string, mmi as double, net as string, nst as short, place as string, rms as double, sig as short, sources as string, status as string, time as long, title as string, tsunami as boolean, type as string, types as string, tz as string, updated as long, url as string), type as string)[],",
+						"          metadata as (api as string, count as short, generated as long, status as short, title as string, url as string),",
+						"          type as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     documentForm: 'documentPerLine') ~> CargadaDimensao",
+						"CargadaDimensao foldDown(unroll(features, features),",
+						"     mapColumn(",
+						"          geometry = features.geometry,",
+						"          id = features.id,",
+						"          properties = features.properties,",
+						"          type = features.type",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flatten2",
+						"flatten2 aggregate(groupBy(CODIGO_REDE = properties.net),",
+						"     contagem_dummy = count()) ~> aggregate2",
+						"aggregate2 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          REDE_SK as integer,",
+						"          CODIGO_REDE as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          CODIGO_REDE",
+						"     )) ~> sink1"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_ADLS_Raw')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_DIM')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_Carga_Fato')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_ADLS_Raw",
+								"type": "DatasetReference"
+							},
+							"name": "CargadaFato"
+						},
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_DIM",
+								"type": "DatasetReference"
+							},
+							"name": "CargadaDimensao"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_FATO",
+								"type": "DatasetReference"
+							},
+							"name": "sink1"
+						}
+					],
+					"transformations": [
+						{
+							"name": "flatten1"
+						},
+						{
+							"name": "lookup1"
+						},
+						{
+							"name": "derivedColumn1"
+						},
+						{
+							"name": "select1"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          bbox as double[],",
+						"          features as (geometry as (coordinates as double[], type as string), id as string, properties as (alert as string, cdi as double, code as string, detail as string, dmin as double, felt as short, gap as short, ids as string, mag as double, magType as string, mmi as double, net as string, nst as short, place as string, rms as double, sig as short, sources as string, status as string, time as long, title as string, tsunami as boolean, type as string, types as string, tz as string, updated as long, url as string), type as string)[],",
+						"          metadata as (api as string, count as short, generated as long, status as short, title as string, url as string),",
+						"          type as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     documentForm: 'documentPerLine') ~> CargadaFato",
+						"source(output(",
+						"          REDE_SK as integer,",
+						"          CODIGO_REDE as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> CargadaDimensao",
+						"CargadaFato foldDown(unroll(features),",
+						"     mapColumn(",
+						"          geometry = features.geometry,",
+						"          id = features.id,",
+						"          properties = features.properties,",
+						"          type = features.type",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flatten1",
+						"flatten1, CargadaDimensao lookup(properties.net == CODIGO_REDE,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'auto')~> lookup1",
+						"lookup1 derive(DATA_HORA_UTC = toTimestamp(toLong(properties.time)),",
+						"          LONGITUDE = toDecimal(geometry.coordinates[1], 10, 6),",
+						"          LATITUDE = toDecimal(geometry.coordinates[2], 10, 6),",
+						"          PROFUNDIDADE = toDecimal(geometry.coordinates[3], 10, 3)) ~> derivedColumn1",
+						"derivedColumn1 select(mapColumn(",
+						"          id,",
+						"          REDE_SK,",
+						"          CODIGO_REDE,",
+						"          DATA_HORA_UTC,",
+						"          LONGITUDE,",
+						"          LATITUDE,",
+						"          PROFUNDIDADE,",
+						"          MAGNITUDE = properties.mag,",
+						"          LOCAL_DESCRICAO = properties.place",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> select1",
+						"select1 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          EVENTO_SK as long,",
+						"          EVENTO_ID as string,",
+						"          REDE_SK as integer,",
+						"          DATA_HORA_UTC as timestamp,",
+						"          MAGNITUDE as decimal(6,2),",
+						"          PROFUNDIDADE_KM as decimal(10,3),",
+						"          LONGITUDE as decimal(10,6),",
+						"          LATITUDE as decimal(10,6),",
+						"          LOCAL_DESCRICAO as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          EVENTO_ID = id,",
+						"          REDE_SK,",
+						"          DATA_HORA_UTC,",
+						"          MAGNITUDE,",
+						"          PROFUNDIDADE_KM = PROFUNDIDADE,",
+						"          LONGITUDE,",
+						"          LATITUDE,",
+						"          LOCAL_DESCRICAO",
+						"     )) ~> sink1"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_ADLS_Raw')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_DIM')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_FATO')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_CP_USGS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_REST",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_ADLS_Raw",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "DF_Carga_Dimensao",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "Copy data1",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Carga_Dimensao",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"CargadaDimensao": {},
+									"sink1": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "DF_Carga_Fato",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "DF_Carga_Dimensao",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Carga_Fato",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"CargadaFato": {},
+									"CargadaDimensao": {},
+									"sink1": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-09-26T04:42:36Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_REST')]",
+				"[concat(variables('factoryId'), '/datasets/DS_ADLS_Raw')]",
+				"[concat(variables('factoryId'), '/dataflows/DF_Carga_Dimensao')]",
+				"[concat(variables('factoryId'), '/dataflows/DF_Carga_Fato')]"
+			]
+		}
+	]
+}

@@ -1,0 +1,91 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Nome do Data Factory",
+			"defaultValue": "adf-cp2-rm555295"
+		},
+		"LS_ADLS_Gen2_accountKey": {
+			"type": "secureString",
+			"metadata": "Cadeia de caracteres segura para 'accountKey' de 'LS_ADLS_Gen2'"
+		},
+		"LS_Azure_SQL_password": {
+			"type": "secureString",
+			"metadata": "Cadeia de caracteres segura para 'password' de 'LS_Azure_SQL'"
+		},
+		"LS_ADLS_Gen2_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://stgcp2rm555295.dfs.core.windows.net/"
+		},
+		"LS_Azure_SQL_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "aci-cp2-rm555295.database.windows.net"
+		},
+		"LS_Azure_SQL_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "cp2-db-dw-rm555295"
+		},
+		"LS_Azure_SQL_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "MYSQL_ADMIN_PASSWORD"
+		},
+		"LS_REST_API_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://earthquake.usgs.gov/"
+		},
+		"containerUri": {
+			"type": "string",
+			"metadata": "URI para a conta de armazenamento contendo os modelos do ARM vinculados"
+		},
+		"containerSasToken": {
+			"type": "string",
+			"metadata": "Token SAS para a conta de armazenamento contendo modelos do ARM vinculados"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "adf-cp2-rm555295_ArmTemplate_0",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2024-03-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_0.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					},
+					"LS_ADLS_Gen2_accountKey": {
+						"value": "[parameters('LS_ADLS_Gen2_accountKey')]"
+					},
+					"LS_Azure_SQL_password": {
+						"value": "[parameters('LS_Azure_SQL_password')]"
+					},
+					"LS_ADLS_Gen2_properties_typeProperties_url": {
+						"value": "[parameters('LS_ADLS_Gen2_properties_typeProperties_url')]"
+					},
+					"LS_Azure_SQL_properties_typeProperties_server": {
+						"value": "[parameters('LS_Azure_SQL_properties_typeProperties_server')]"
+					},
+					"LS_Azure_SQL_properties_typeProperties_database": {
+						"value": "[parameters('LS_Azure_SQL_properties_typeProperties_database')]"
+					},
+					"LS_Azure_SQL_properties_typeProperties_userName": {
+						"value": "[parameters('LS_Azure_SQL_properties_typeProperties_userName')]"
+					},
+					"LS_REST_API_properties_typeProperties_url": {
+						"value": "[parameters('LS_REST_API_properties_typeProperties_url')]"
+					}
+				}
+			},
+			"dependsOn": []
+		}
+	]
+}
